@@ -1,0 +1,311 @@
+* Tensorboard Embeddings 可视化功能
+
+** 其他处理部分
+
+#+NAME: process-to-avoid-reload-graph
+#+BEGIN_SRC ipython :tangle yes :noweb yes :session lec4-3 :exports code :results raw drawer
+   <<get-pid>>
+   <<kill-pid>>
+   <<del-graph-summary>>
+   <<tensorboard-run>>
+   <<run-tensorboard>>
+#+END_SRC
+
+#+RESULTS: process-to-avoid-reload-graph
+:RESULTS:
+# Out[4]:
+:END:
+
+#+name: get-pid
+#+BEGIN_SRC shell :results outputs
+ps -aux | grep "python" | grep -E "(default|lec4|tensorboard)" | grep -v "grep" | awk '{print $2}'
+#+END_SRC
+
+#+RESULTS: get-pid
+|  6675 |
+| 11038 |
+| 11044 |
+| 32122 |
+
+#+name: kill-pid
+#+BEGIN_SRC elisp :results outpout :var pid=get-pid
+  ;; 取元素
+  (defun r1l(tbl)
+    (mapcar (lambda (x) (number-to-string (car x))) tbl)
+    )
+  ;; (print pid)
+  ;; (print (reduce-one-layer pid))
+  (mapcar #'shell-command-to-string
+          (mapcar (lambda (x) (concat "kill " x)) (r1l pid))))
+#+END_SRC
+
+#+RESULTS: kill-pid
+|   |   |   |   |
+
+#+name: del-graph-summary
+#+BEGIN_SRC shell :results output
+  rm -rf /home/yiddi/git_repos/on_ml_tensorflow/logs/*
+  ls /home/yiddi/git_repos/on_ml_tensorflow/logs
+#+END_SRC
+
+#+RESULTS: del-graph-summary
+
+** 主要代码部分
+#+BEGIN_SRC ipython :tangle yes :noweb yes :session lec2-simple-MNIST :exports code :async t :results raw drawer
+  <<包导入>>
+  # <<导入 projector: for embeddings 可视化>>
+
+
+  <<数据准备>>
+  # numpy构造(with/without noise)
+  # 数据集导入内存(one_hot or not)
+  # 截取已经存在数据集
+
+  <<图参数>>
+  # 批次大小
+  # 批次数量
+  # dropout 保留率
+  # 数据集位置
+
+  <<工具函数与工具声明>>
+  # 对某些 Variable 进行 OP 并 summary
+  # <<def Variable: for embeddings 可视化>> as untrainable Variable, stack front 3000 img, give name 'embeddings'
+  # <<file IO: for embeddings 可视化>> read in one_hot labels, argmax get true labels, write to file in one-label-one-line format
+
+  <<图构造>>
+  # 一神: NN layers, name_scope for TB, 参数 summary
+  # 1. placeholders
+  #    1.1 x: dataset placeholder,
+  #    + <<def OP: for img process >> reshape x
+  #    1.2 y: labelset placeholder,
+  #    1.3 keep_prob: dropout, keep rate of certain layer's nodes
+  # 2. Variables
+  #    2.0 名称空间设置
+  #    2.1 第一层权重 W, 声明 summary tf.summary.scalar/image/histogram node
+  #    2.2 第一层偏置 b, 声明 summary tf.summary.scalar/image/histogram node
+  # 3. Operations
+  #    3.1 第一层输出(active_fn(score)), 声明 summary tf.summary.scalar/image/histogram node
+
+  # 两函:
+  #   1. err_fn:
+  #      1.1 名称空间设置
+  #      1.2 err fn(单点错误), 声明 summary, tf.summary.scalar/image/histogram node
+  #   2. loss_fn:
+  #      2.1 名称空间设置
+  #      2.2 loss fn(整体错误), 声明 summary, tf.summary.scalar/image/histogram node
+
+  # 两器:
+  #   1. 初始化器
+  #   2. 优化器
+  #      2.1 名称空间设置
+
+  # 准确率计算
+  #   1. correct_prediction
+  #      1.1 名称空间设置
+  #   2. accuracy
+  #      2.1 名称空间设置
+
+  # 合并summary
+
+  # 配置 embeddings 可视化参数
+
+  <<图计算>>
+  # 运行初始化器
+  # summary Writer for TB
+  # for epoch_num: <<
+  #          1. for batch_num:
+  #                 1.1 x_y_of_next_batch;
+  #                 1.2 运行 优化器计算 and summary计算
+  #          2. 运行准确率计算
+  # matplot绘图
+#+END_SRC
+
+#+name: tensorboard-visual
+#+BEGIN_SRC ipython :tangle yes :session :exports code :async t :results raw drawer
+  import tensorflow as tf
+  from tensorflow.contrib.tensorboard.plugins import projector
+  from tensorflow.examples.tutorials.mnist import input_data
+
+  mnist = input_data.read_data_sets("MNIST", one_hot=True)
+  max_steps = 1001
+  image_num = 3000
+  DIR = "/home/yiddi/git_repos/on_ml_tensorflow/"
+
+  sess = tf.Session()
+
+  # 这里记录了你如何获取数据集中的一部分的操作,这里是获取测试集图片的前3000张
+  embeddings = tf.Variable(tf.stack(mnist.test.images[:image_num]), trainable=False, name='embeddings')
+
+  def variable_summaries(var):
+      with tf.name_scope('summaries'):
+          mean = tf.reduce_mean(var)
+          tf.summary.scalar('mean', mean)
+          with tf.name_scope('stddev'):
+                stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+          tf.summary.scalar('stddev', stddev)
+          tf.summary.scalar('max', tf.reduce_max(var))
+          tf.summary.scalar('min', tf.reduce_min(var))
+          tf.summary.histogram('histogram', var)
+
+
+  with tf.name_scope('input'):
+      x=tf.placeholder(tf.float32, [None,784], name='x-input') # -->-+ 因为 placeholder.shape 与数据集.shape 是一致的,而构建图的时候
+      y=tf.placeholder(tf.float32, [None,10], name='y-input')  #     | 我们并不知道数据集有多少个样本, 所以 placeholder 第一维度设置
+                                                               #     v 为 None, 这样就导致 image_shaped_input 第一维度设置为-1, 表示
+                                                               #     | 此处值自适应, 当前不确定.
+  with tf.name_scope('input_reshape'):                         #     |
+      image_shaped_input = tf.reshape(x, [-1, 28, 28, 1])      # -<--+ 这里reshape的目的是把以向量形式存储的图片,还原成矩阵的形式以便绘制
+      tf.summary.image('input', image_shaped_input, 10)        # 这里是放置 10 张图片进入 summary file
+
+  with tf.name_scope('layer'):
+      with tf.name_scope('weights'):
+          W=tf.Variable(tf.zeros([784, 10]),name='W')
+          variable_summaries(W)
+
+      with tf.name_scope('biases'):
+          b=tf.Variable(tf.zeros([10]),name='b')
+          variable_summaries(b)
+
+      with tf.name_scope('score'):
+          score=tf.matmul(x, W) + b
+
+      with tf.name_scope('softmax'):
+          prediction=tf.nn.softmax(score)
+
+  with tf.name_scope('loss'):
+      loss=tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=prediction))
+      tf.summary.scalar('loss', loss)
+  with tf.name_scope('train'):
+      train_step = tf.train.GradientDescentOptimizer(0.5).minimize(loss)
+
+  sess.run(tf.global_variables_initializer())
+
+  with tf.name_scope('accuracy'):
+      with tf.name_scope('correct_prediction'):
+          correct_prediction=tf.equal(tf.argmax(y,1), tf.argmax(prediction, 1))
+      with tf.name_scope('accuracy'):
+          accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+          tf.summary.scalar('accuracy', accuracy)
+
+  # 产生metadata文件
+  # 把每个sample的标签(即,对应什么数字) 写入metadata文件中
+  # metadata.tsv 形如:
+  # -------------
+  # 1 \
+  # 7  |
+  # 0  |
+  # 6  |
+  # .  |-- 3000 行
+  # .  |
+  # .  |
+  # 3  |
+  # 9 /
+  # -------------
+  if tf.gfile.Exists(DIR + 'projector/projector/metadata.tsv'):
+      tf.gfile.Remove(DIR + 'projector/projector/metadata.tsv')
+  with open(DIR + 'projector/projector/metadata.tsv', 'w') as f:
+      labels = sess.run(tf.argmax(mnist.test.labels[:], 1))
+      for i in range(image_num):
+          f.write(str(labels[i]) + '\n')
+
+  merged = tf.summary.merge_all()
+
+  # 配置 embedding 可视化相关参数
+  projector_writer = tf.summary.FileWriter(DIR + 'projector/projector', sess.graph)
+  saver = tf.train.Saver() #可以保存网络模型, 生成 ckpt file.
+  config = projector.ProjectorConfig() # 定义配置文件
+  embed= config.embeddings.add()
+  embed.tensor_name = embeddings.name #存储部分数据集的untrainable Variable名字赋值给 embedding 层的tensor_name
+  embed.metadata_path = DIR + 'projector/projector/metadata.tsv' # labels 文件名
+  embed.sprite.image_path = DIR + 'projector/projector/mnist_10k_sprite.png' # 原始图片文件
+  embed.sprite.single_image_dim.extend([28,28]) # 按照 28*28 切分文件
+  projector.visualize_embeddings(projector_writer, config) # 载入 writer 和 config 进行可视化, 产生 xxxx.pbtxt file
+
+  for i in range(max_steps):
+      batch_xs, batch_ys = mnist.train.next_batch(100)
+      run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE) # 固定用法
+      run_metadata = tf.RunMetadata() # 固定用法
+      summary, _ = sess.run([merged, train_step], feed_dict={x:batch_xs, y:batch_ys}, options=run_options, run_metadata=run_metadata)
+      projector_writer.add_run_metadata(run_metadata, 'step%03d' % i)
+      projector_writer.add_summary(summary, i)
+
+      if i%100 == 0:
+          acc=sess.run(accuracy, feed_dict={x:mnist.test.images, y:mnist.test.labels})
+          print("Iter " + str(i) + ", Testing Accuracy= "  + str(acc))
+
+  saver.save(sess, DIR + 'projector/projector/a_model.ckpt', global_step=max_steps)
+  projector_writer.close()
+  sess.close()
+#+END_SRC
+
+#+RESULTS: tensorboard-visual
+:RESULTS:
+# Out[1]:
+:END:
+
+#+BEGIN_SRC emacs-lisp :tangle yes
+(require 'ob-async)
+#+END_SRC
+
+#+RESULTS:
+: ob-async
+
+#+name: run-tensorboard
+#+BEGIN_SRC sh :session YiddiTensorboard :results outputs :async
+tensorboard --logdir=/home/yiddi/git_repos/on_ml_tensorflow/projector/projector
+#+END_SRC
+
+#+RESULTS: run-tensorboard
+: d0b50d716025b683cdae4cf4e54826d7
+
+embedding 可视化流程
+#+BEGIN_EXAMPLE
+         ^Embedding Space
+         |
+         |
+         |          2                     TensorBoard
+         |         22
+         |
+         |       2         0
+         |     1             00          ---------<-----------------------------------------+
+         |    111            0                                                              |
+         |                                                                                  |
+  -------+---------------------------->                                                     |
+         |                                                                                  |
+                                                       用于在TB中显示每个点的真实label      |
+                                                                                            | PCA: from 784D to 2D
+  +--------------+                                                                          |
+  |    ...       |                                     metadata.tsv    -------------        |
+  |    ...       |                                                     1 \                  |
+  |     ..       |                           embed.metadata_path       7  |                 |
+  |     ..       |   -------------+          = xxx.tsv                 0  |                 |
+  |   ......     |                |                                    6  |                 |
+  |   ......     |                |                                    .  |-- 3000 行       ^
+  +--------------+                |                                    .  |                 |
+  \              /                |                                    .  |                 |
+   \            /                 |                                    3  |                 |
+    \          /                  |                                    9 /                  |
+     \         |                  |                                    -------------        |
+      \        |                  |                                                         |
+       \       |                  |                                                         |
+        \      |                  |                     embeddings                          |
+         \     |                  |                             784 D                       |
+          \   /                   |                     /-----------------------\           |
+  +--+--+--+--+--+                |                    [[12, 143, 120, 1, 23, ...]    \     |
+  |  |  |  |  |  |                |                     [12, 139, 151, 9, 63, ...]     |
+  +--+--+--+--+--+                |                     [22, 199, 120, 3, 83, ...]     |  3000 行
+  |  |  |  |  |  |                +------------------   [62, 177, 192, 5, 13, ...]     |
+  +--+--+--+--+--+                                      ...                            |
+  |  |  |  |  |  |                                      [91, 254, 120, 14, 30, ...]]  /
+  +--+--+--+--+--+
+  |  |  |  |  |  |                                     数据集中的点集
+  +--+--+--+--+--+                                     embed.tensor_name = embeddings.name
+  |  |  |  |  |  |
+  +--+--+--+--+--+                                     用来做降维并在TB显示的数据集
+  数据集中的点对应的图片集
+
+  embed.sprite.image_path = xxx.png
+
+  用于在 TB embedding 坐标中显示其
+  原始图片是什么.
+#+END_EXAMPLE

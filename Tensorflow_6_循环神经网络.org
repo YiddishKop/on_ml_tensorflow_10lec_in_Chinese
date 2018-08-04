@@ -1,0 +1,296 @@
+* Tensorflow RNN
+** 代码架构
+#+BEGIN_SRC ipython :tangle yes :noweb yes :session lec2-simple-MNIST :exports code :async t :results raw drawer
+  <<包导入>>
+  # <<导入 projector: for embeddings 可视化>>
+
+
+  <<数据准备>>
+  # numpy构造(with/without noise)
+  # 数据集导入内存(one_hot or not)
+  # 截取已经存在数据集
+
+  <<图参数>>
+  # 批次大小, batch_size
+  # 批次数量, n_batch
+  # dropout 保留率, keep_prob
+  # 数据集位置
+  # + <<for rnn >>n_inputs: dimension of each item(a vector) of sequence
+  # + <<for rnn >>max_time: the max length of all sequences(maybe the size of Dataset), max_time also means the iteration time of rnn layer
+  # + <<for rnn >>lstm_size: inside of each rnn layer, how many lstm units
+  # + <<for rnn >>n_classes: units of ful nn layer
+
+  <<工具函数与工具声明>>
+  # 对某些 Variable 进行 OP 并 summary
+  # <<def Variable: for embeddings 可视化>> as untrainable Variable, stack front 3000 img, give name 'embeddings'
+  # <<file IO: for embeddings 可视化>> read in one_hot labels, argmax get true labels, write to file in one-label-one-line format
+  # W, b 初始化工具函数
+
+  <<图构造>>
+  # 一神: NN layers, name_scope for TB, 参数 summary
+  #   1. placeholders
+  #      1.1 x: dataset placeholder,
+  #      + <<def OP: for img process, CNN[-1, height, width, channels], RNN[-1, max_time, n_inputs] >> reshape x  ------+
+  #      1.2 y: labelset placeholder,                                                                                   |
+  #      1.3 keep_prob: dropout, keep rate of certain layer's nodes                                                     |
+  #   2. Variables                                                                                                      |
+  #      2.0 名称空间设置                                                                                               |
+  #      2.1 第一层权重 W, 声明 summary tf.summary.scalar/image/histogram node                                          |
+  #      2.2 第一层偏置 b, 声明 summary tf.summary.scalar/image/histogram node                                          |
+  #      + <<conv2d layer: for CNN>> 只接受 [batch_size, height, width, channels] 格式 <--------------------------------+
+  #      + <<max_pool layer: for CNN>>                                                                                  |
+  #      + <<BasicLSTMCell: for RNN>>                                                                                   |
+  #      + <<dynamic_rnn(units, inputs): for RNN>>                                                                      |
+  #                               ^                                                                                     |
+  #                               +-------------------------------------------------------------------------------------+
+
+  #   3. Operations
+  #      3.1 第一层输出(active_fn(score)), 声明 summary tf.summary.scalar/image/histogram node
+
+  # 两函:
+  #   1. err_fn:
+  #      1.1 名称空间设置
+  #      1.2 err fn(单点错误), 声明 summary, tf.summary.scalar/image/histogram node
+  #   2. loss_fn:
+  #      2.1 名称空间设置
+  #      2.2 loss fn(整体错误), 声明 summary, tf.summary.scalar/image/histogram node
+
+  # 两器:
+  #   1. 初始化器
+  #   2. 优化器
+  #      2.1 名称空间设置
+
+  # 准确率计算
+  #   1. correct_prediction
+  #      1.1 名称空间设置
+  #   2. accuracy
+  #      2.1 名称空间设置
+
+  # 合并summary
+
+  # 配置 embeddings 可视化参数
+
+  <<图计算>>
+  # 运行初始化器
+  # summary Writer for TB
+  # for epoch_num: <<
+  #          1. for batch_num:
+  #                 1.1 x_y_of_next_batch;
+  #                 1.2 运行 优化器计算 and summary计算
+  #          2. 运行准确率计算
+  # matplot绘图
+#+END_SRC
+** 源代码
+#+BEGIN_SRC ipython :tangle yes :session lec-5-RNN :exports code :async t :results raw drawer
+  import tensorflow as tf
+  from tensorflow.examples.tutorials.mnist import input_data
+
+  # LOAD DATA
+  mnist = input_data.read_data_sets("MNIST", one_hot=True)
+
+  # GRAPH BUILDING
+  # ==============
+  # shape of input image: 28*28, feed one 'line' of an image to
+  # input layer each time, so input layer has 28 neurons, so that
+  # each image can be seen as a 28 length sequence of 28-D vectors.
+  # Many to one RNN
+
+  n_inputs = 28 # input one line, 28 scalar each line
+  max_time = 28 # 28 lines totally
+  lstm_size = 100 # number of unit of hidden layer
+  n_classes = 10 # number of kinds of labels
+  batch_size = 50 # size of each batch
+  n_batch = mnist.train.num_examples // batch_size # number batches in each epoch
+
+  x = tf.placeholder(tf.float32, [None, 784])
+  y = tf.placeholder(tf.float32, [None, 10])
+
+  # weights variable initialization
+  weights = tf.Variable(tf.truncated_normal([lstm_size, n_classes], stddev=0.1))
+  # biases variable initialization
+  biases = tf.Variable(tf.constant(0.1, shape=[n_classes]))
+
+  # RNN building helper function. Note that, RNN is designed for sequence
+  # learning, so that each input must be a sequence of vectors(dimension of
+  # vector is compatible with number of units of the RNN layer). Here each input
+  # is a |max_time| length sequence of |n_inputs| dimensin vectors. As each image
+  # is seen as a sequence of row pixels.
+  def RNN(X, weights, biases):
+      # inputs = [batch_size, max_time, n_inputs]
+      inputs = tf.reshape(X, [-1, max_time, n_inputs])
+      # define LSTM basic cell
+      lstm_cell = tf.contrib.rnn.BasicLSTMCell(lstm_size)
+      # final_state[0] is cell state, 这是下一次循环时 rnn layers LSTM cell 里存的值
+      # final_state[1] is hidden state, 这是 rnn layer 的输出
+      outputs, final_state = tf.nn.dynamic_rnn(lstm_cell, inputs, dtype=tf.float32)
+      results = tf.nn.softmax(tf.matmul(final_state[1], weights) + biases)
+      return results
+
+  # RNN related operation node
+  prediction = RNN(x, weights, biases)
+  # loss fn
+  cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=prediction, labels=y))
+  # apply AdamOptimizer
+  train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+  # store results in a boolean list
+  correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(prediction, 1))
+  # compute accuracy
+  accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+  # global initialization
+  init= tf.global_variables_initializer()
+
+  # GRAPH COMPUTATION
+  # =================
+  with tf.Session() as sess:
+      sess.run(init)
+      for epoch in range(6):
+          for batch in range(n_batch):
+              batch_xs, batch_ys = mnist.train.next_batch(batch_size)
+              sess.run(train_step, feed_dict={x:batch_xs, y:batch_ys})
+
+          acc = sess.run(accuracy, feed_dict={x:mnist.test.images, y:mnist.test.labels})
+          print("Iter " + str(epoch) + ", Testing Accuracy= " + str(acc))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[4]:
+:END:
+
+** 注意之前的理解有误
+
+   对于这 5 条经常出现的语句, 我一开始理解 x 的这个 shape 就直接定义了数据集大小,
+   *但其实这是错误的*. x 并没有指定数据集最终大小, 这个 None 是 *交给用户最终确
+   定*, 你给 x 喂多少个样本, 这个维度就是多少维, 也就是 sample 数量的大小. 它可
+   以是:
+   - 数据集大小: GD
+   - 批次大小: batch learning
+   - 1: SGD
+
+   本套十课教程很明显,都是采用 batch learning, 这个 None 最终被喂食的是
+   ~batch_size * flatten_shape(sample)~
+   #+BEGIN_EXAMPLE
+   x = tf.placeholder(tf.float32, [None, 784])
+   y = tf.placeholder(tf.float32, [None, 10])
+   batch_xs, batch_ys = mnist.train.next_batch(batch_size)
+   sess.run(train_step, feed_dict={x:batch_xs, y:batch_ys})
+   inputs = tf.reshape(X, [-1, max_time, n_inputs])
+   #+END_EXAMPLE
+
+** 注意理解 RNN layer
+
+#+BEGIN_SRC ipython :tangle yes :session :exports code :async t :results raw drawer
+  def RNN(X, weights, biases):
+      # inputs = [batch_size, max_time, n_inputs]
+      inputs = tf.reshape(X, [-1, max_time, n_inputs])
+      # define LSTM basic cell
+      lstm_cell = tf.contrib.rnn.core_rnn_cell.BasicLSTMCell(lstm_size)
+      # final_state[0] is cell state
+      # final_state[1] is hidden state
+      outputs, final_state = tf.nn.dynamic_rnn(lstm_cell, inputs, dtype=tf.float32)
+      results = tf.nn.softmax(tf.matmul(final_state[1], weights) + biases)
+      return results
+#+END_SRC
+
+*** dynamic_rnn 函数的输入
+一个 rnn layer 只处理图片的一行(a vector), rnn layer 循环 max_time 次, 可以处理
+一张图片(a sequence of vectors).
+#+BEGIN_EXAMPLE
+  |    |    |
++--------------+  这就是一个 RNN layer :
+|+-+  +-+  +-+ |  tf.nn.dynamic_rnn(lstm_cell, inputs, dtype=tf.float32)
+|+-+  +-+  +-+ |                          ^       ^
+|           \-----------------------------+       |
+|              |                                  |
+|==============|                                  |
+|              |                                  |
+|  ********** ------------------------------------+
++--------------+
+
+tf.nn.dynamic_rnn 包含两个参数:
+- LSTM cells
+     tf.contrib.rnn.BasicLSTMCell(lstm_size)
+- batchsized_inputs
+     这里 dynamic_rnn 要求 shape of input is :
+     [batch_size, 最长sequence包含的 item 数目, 每个item(a vector)的维度 ]
+#+END_EXAMPLE
+
+*** dynamic_rnn 函数的输出
+由于 RNN 的特殊性, 他的构建函数返回一个 2-tuple(= (outputs, final_state)), 其包
+含两个 item:
+
+- 其一, 整条时间线上(一个时间点输入图片的一行; 一个时间线输入完整张图片)的输出
+  , 然后 stack batch_size 次;
+- 其二, 两元素列表:最终时间点的输出和最终时间点的 memory_cell 值, 并且各自 stack
+  batch_size 次.
+
+
+#+BEGIN_EXAMPLE
+  RNN layer 的构造与普通 NN hiden layer 完全不同, 普通 NN 层次分明, input layer 和
+  hidden layer 的输入输出分别独立声明, 而 RNN layer 的声明直接将 inputs 的声明纳入
+  进来.
+
+
+                                   ~outputs~ 是包含了从 time 1~max_time 每个时间点整个网络的输出
+
+                                   outputs (.shape=[batch_size, max_time, cell.output_size])
+   ____________________________________^______________________________________
+  /                                                                           \
+
+   each time output of                                                      final_hidden_state(.shape=[batch_size, cell.output_size])
+   RNN layer is:                                                         +-----------------------------------+
+   cell.output_size                                                      |                                  /
+    _____^_____                                                     _____^_____           [ [^            ]/
+   /           \                                                   /           \            /             /
+    |    |    |             |    |    |                             |    |    |            /[            v] ] final state
+  +--------------+        +--------------+                        +--------------+        |
+  |+-+  +-+  +-+ |        |+-+  +-+  +-+ |                        |+-+  +-+  +-+ |        /
+  |+-+  +-+  +-+ |        |+-+  +-+  +-+ |                        |+-+  +-+  +-+ |       /
+  |              |------->|              |------>...........----->| |    |    |  |       |
+  |              |        |              |                        | +----+----+----------+   final_cell_state(.shape=[batch_size, cell.outpu_size])
+  |==============|        |==============|                        |==============|
+  |              |        |              |                        |              |
+  |  **********  +        |  **********  +                        |  **********  +
+  +--------------+        +--------------+                        +--------------+
+  time_1 : vect_1         time_2 : vect_2                         time_max_time : vect_max_time
+
+
+     vect_dim
+     ,*
+     vect_num (-> max_time -> sequence )
+     ,*
+     seq_num (-> batch_size)
+#+END_EXAMPLE
+
+*** RNN layer 在整个架构中的位置
+
+#+BEGIN_EXAMPLE
+ @ @ @ @ @ @ @ @ @ @         label, one-hot encoding
+
+        /\
+       |  |
+       |  |                   compute cross_entropy
+       |  |
+        \/
+
+ * * * * * * * * * *          predict probability, output of fully connected layer
+ | | | | | | | | | |
+ -------------------          softmax as active function
+   \    |    |    /
+
+     +---------+
+     |    W    |              weights of fully connected layer
+     +---------+
+
+     |    |    |              final output of RNN layer
+   +--------------+
+   |+-+  +-+  +-+ |
+   |+-+  +-+  +-+ |
+   |              |
+   |              |           final time RNN layer
+   |==============|
+   |              |
+   |  **********  |
+   +--------------+
+
+#+END_EXAMPLE

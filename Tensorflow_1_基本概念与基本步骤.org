@@ -1,0 +1,219 @@
+* Tensorflow 介绍
+
+*** 基本概念
+- 使用图 (Graphs) 来表示 *计算规划*;
+- 使用 Tensor 表示 *数据*
+- 图中的节点称之为 *操作* (operation), 一个操作获得 0 个或 n 个 Tensor
+- 使用 feed 为操作 *赋值*, 使用 fetch 从操作中 *取值*
+- 在被称之为会话(Session)的上下文(Context)中 *执行* 图(graphs)
+- 通过变量(variable)维护 *状态*
+
+#+DOWNLOADED: /tmp/screenshot.png @ 2018-07-26 15:56:04
+[[file:Tensorflow 介绍/screenshot_2018-07-26_15-56-04.png]]
+
+*** tensorflow 使用流程总结
+#+BEGIN_EXAMPLE
+3步骤:
+
+  准备数据, 图构建, 图计算
+           |   |   |
+           |   |   |
+
+           数, 构, 计
+
+               |   |
+               |   |
+              /     \
+一模,两函,两器       运行两器
+#+END_EXAMPLE
+
+*** eg: 创建图和计算图
+#+BEGIN_SRC ipython :tangle yes :session lec1 :exports code :async t :results raw drawer
+  import tensorflow as tf
+
+
+  # graph => feed/fetch(op(tensor))
+  #  |
+  #  | do computation
+  #  v
+  # session
+
+  # ======= 构图 ======
+  # tensors shape 1*2
+  cons1 = tf.constant([[1, 2]])
+  # tensors shape 2*1
+  cons2 = tf.constant([[1], [2]])
+  # ops matrix multiply
+  mat_product = tf.matmul(cons1, cons2)
+  print(mat_product)  # 这个只会打印 'result1' 对象引用信息
+
+  # ======= 对话 方式1 ======
+  # 必须执行关闭操作
+  sess = tf.Session()
+  result = sess.run(result1)
+  print(result)  # 这个只会打印 'result1' 对象引用信息
+  sess.close()
+
+  # ======= 对话 方式2 ======
+  # 不用执行关闭操作
+  with tf.Session() as sess:
+      result = sess.run(result1)
+      print(result)  # 这个只会打印 'result1' 对象引用信息
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[6]:
+:END:
+
+*** eg: 变量的使用
+1. 使用之前必须初始化(初始化是一个op,图执行计算之前,必须先运行该初始化op)
+#+BEGIN_SRC ipython :tangle yes :session lec1 :exports code :async t :results raw drawer
+  import tensorflow as tf
+
+  x = tf.Variable([1, 2])
+
+  a = tf.constant([3, 3])
+
+  # 减法 op
+  sub = tf.subtract(x, a)
+  # 加法 op
+  add = tf.add(x, sub)
+  # initializer op
+  init = tf.global_variables_initializer()
+
+  with tf.Session() as sess:
+      sess.run(init)
+      print(sess.run(sub))
+      # error FailedPreconditionError (see above for
+      # traceback): Attempting to use uninitialized value Variable_1
+      print(sess.run(add))
+#+END_SRC
+
+*** eg: 变量循环自增
+#+BEGIN_SRC ipython :tangle yes :session lec1 :exports code :async t :results raw drawer
+  # variable, initialize with 0
+  # state = 0
+  state = tf.Variable(0, name='counter')
+  # 加法 op, 使state加1
+  # new_value = state + 1
+  new_value = tf.add(state, 1)
+  # 赋值 op
+  # state = new_value
+  update = tf.assign(state, new_value)
+  init= tf.global_variables_initializer()
+
+  with tf.Session() as sess:
+      sess.run(init)
+      print(sess.run(state))
+      for _ in range(5):
+          sess.run(update)
+          print(sess.run(state))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[11]:
+:END:
+
+*** eg: fetch and feed
+
+fetch 和 feed 是 ~sess.run()~ 参数的两种进阶形式, fetch 是说第一个参数(输出节点)
+可以使 one node, 也可以是 list of nodes; feed 是说第二个参数(输入节点)可以以字典
+(~{占位符引用:list of values, 占位符引用: list of values, 占位符引用: list of
+values, ...}~) 的形式给图中的占位符喂数据. 这里为什么字典值是 *list of values*
+因为这里实际上应该是 Dataset, run() 函数会每次从中取一行(也就是一个sample)输入
+placeholder中.
+
+关于 variable 和 placeholder 的区别, variable 是一个 dependent 量, 他的值需要依
+赖其他 node 值, 这有点像是 y = x + 3 中的 y. 他常常用在 hypothesis function 的表
+达中, 比如 y=wx+b 其中. w,b 就是 variable; placeholder 不是 dependent 量, 他的值
+不需要依赖计算, 而是直接从外部给出, *可以说 placeholder 是为 variable 生*.
+y=wx+b 中 x 和 y 就是 placeholder 他们代表已知的数据集和标签.
+
+注意, placeholder 的shape与数据集的shape是一样的. 假设你要输入的数据集是
+(60000, 784) 维度,那么你设置的 placeholder 也应该是 (60000, 784)
+
+#+BEGIN_QUOTE
+variable ===> initializer
+
+placeholder ===> run(xxx, feed_dict{}})
+#+END_QUOTE
+
+- fetch 是指图在会话中计算的时候可以一次计算多个节点
+#+BEGIN_SRC ipython :tangle yes :session lec1 :exports code :async t :results raw drawer
+  import tensorflow as tf
+
+  # fetch 同时执行多个 op 得到运行结果
+  input1 = tf.constant(3.0)
+  input2 = tf.constant(2.0)
+  input3 = tf.constant(5.0)
+
+  # add op
+  add = tf.add(input2, input3)
+  # multiply op
+  mul = tf.multiply(input1, add)
+
+  with tf.Session() as sess:
+      # print(sess.run(mul))
+      result = sess.run([mul, add]) # fetch
+      print(result)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[13]:
+:END:
+
+- feed 是指以字典形式给 placeholder 喂数据.
+#+BEGIN_SRC ipython :tangle yes :session lec1 :exports code :async t :results raw drawer
+  # 创建占位符
+  input1 = tf.placeholder(tf.float32)
+  input2 = tf.placeholder(tf.float32)
+
+  # multiply op
+  output = tf.multiply(input1, input2)
+
+  with tf.Session() as sess:
+      # 以字典形式 feed 数据
+      print(sess.run(output, feed_dict={input1:[7.0], input2:[2.0]}))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[3]:
+:END:
+
+*** 简单实例
+#+BEGIN_SRC ipython :tangle yes :session :exports code :async t :results raw drawer
+  import numpy as np
+  import tensorflow as tf
+
+  # 1. 数据集准备
+  # 使用numpy生成100个随机点
+  x_data = np.random.rand(100)
+  y_data = x_data * 0.1 + 0.2
+
+  # 2. 图构建
+  # 构造一个线性"模"型
+  b = tf.Variable(0.)
+  k = tf.Variable(0.)
+  y = k * x_data + b
+
+  # 二次代价"函"数
+  loss = tf.reduce_mean(tf.square(y_data - y))
+  # 优化"器"
+  optimizer = tf.train.GradientDescentOptimizer(0.2)
+  # 最小化代价"函"数(argmin 函数)
+  train = optimizer.minimize(loss)
+  # 初始化"器"
+  init = tf.global_variables_initializer()
+
+  # 3. 图计算
+  with tf.Session() as sess:
+      sess.run(init)       # 运行初始化"器"
+      for step in range(201):
+          sess.run(train)  # 运行优化"器"
+          if step % 20 == 0:
+              print(step, sess.run([k, b, loss]))
+#+END_SRC

@@ -1,0 +1,247 @@
+* All in one
+
+#+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output table drawer :prologue
+     <<package-import>>
+     <<dataset-prepare>>
+     <<graph-parameters>>
+     <<build-graph>>
+     <<compute-graph>>
+   #+END_SRC
+
+   #+RESULTS:
+   :RESULTS:
+   0 [0.055745568, 0.100772046, 0.015102302]
+   20 [0.10487924, 0.19728641, 2.0645496e-06]
+   40 [0.10285186, 0.19841398, 7.0529825e-07]
+   60 [0.101666875, 0.19907299, 2.409468e-07]
+   80 [0.10097427, 0.19945817, 8.231386e-08]
+   100 [0.10056943, 0.19968332, 2.8117949e-08]
+   120 [0.10033282, 0.1998149, 9.6057695e-09]
+   140 [0.10019453, 0.19989182, 3.2813714e-09]
+   160 [0.100113705, 0.19993676, 1.1211074e-09]
+   180 [0.100066476, 0.19996303, 3.8314035e-10]
+   200 [0.10003885, 0.1999784, 1.308762e-10]
+   :END:
+
+* 包导入
+  #+name: package-import
+  #+BEGIN_SRC python :tangle yes :exports code :results output drawer :prologue
+ import numpy as np
+ import tensorflow as tf
+  #+END_SRC
+
+* 数据准备
+** 数据准备参数表
+** 数据准备操作
+*** 从 numpy 生成
+  #+name: dataset-prepare-from-numpy
+  #+BEGIN_SRC python :tangle yes :exports code :results output drawer :prologue
+  x_data = np.random.rand(100)
+  prediction = x_data * 0.1 + 0.2
+  #+END_SRC
+
+*** 从已有数据集获取
+
+  #+name: dataset-prepare-from-exist
+  #+BEGIN_SRC python :tangle yes :exports code :results output drawer :prologue
+  mnist = input_data.read_data_sets("MNIST", one_hot=True)
+  #+END_SRC
+
+** 数据准备注释
+ # numpy构造(with/without noise)
+ # 数据集位置
+ # 数据集导入内存(one_hot or not)
+ # 截取部分数据集
+
+* 图参数
+  | batch_size | n_batch |
+  |------------+---------|
+  |        100 |         |
+
+
+  #+name: graph-parameters
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+  <<args-build-graph>>
+  <<args-compute-graph>>
+  batch_size = 100
+  n_batch = mnist.train.num_example // batch_size
+  #+END_SRC
+* 图构造
+  #+name: args-build-graph
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+  <<args-build-graph-head>>
+  <<args-build-graph-body>>
+  <<args-build-graph-tail>>
+  #+END_SRC
+
+  #+name: build-graph
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+  <<build-graph-head>>
+  <<build-graph-body>>
+  <<build-graph-tail>>
+  #+END_SRC
+
+** 图首
+*** 图首参数表
+    | x         | y        |
+    |-----------+----------|
+    | None, 784 | None, 10 |
+
+  #+name: args-build-graph-head
+  #+BEGIN_SRC python :tangle yes :exports code :results output drawer :prologue
+  x_shape = [None, 784]
+  #+END_SRC
+
+
+*** 图首操作
+
+  #+name: build-graph-head
+  #+BEGIN_SRC python :tangle yes :exports code :results output drawer :prologue
+  x = tf.placeholder(tf.float32, [None, 784])
+  y = tf.placeholder(tf.float32, [None, 10])
+  #+END_SRC
+
+*** 图首注释
+ #   1. Placeholders
+ #      1.1 x: dataset placeholder,
+ #      + <<def OP: for img process, CNN[-1, height, width, channels], RNN[-1, max_time, n_inputs] >> reshape x  ------+
+ #      1.2 y: labelset placeholder,                                                                                   |
+ #      1.3 keep_prob: dropout, keep rate of certain layer's nodes                                                     |
+** 图中
+  #+name: args-build-graph-body
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+  <<args-build-graph-body-NN>>
+  <<args-build-graph-body-loss>>
+  <<args-build-graph-body-izer>>
+  #+END_SRC
+
+  #+name: build-graph-body
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+  <<build-graph-body-NN>>
+  <<build-graph-body-loss>>
+  <<build-graph-body-izer>>
+  #+END_SRC
+
+*** 一神
+**** 一神参数表
+   #+name: args-build-graph-body-NN
+   #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+   #+END_SRC
+
+**** 一神工具函数
+**** 一神注释
+**** 一神操作
+  #+name: build-graph-body-NN
+  #+BEGIN_SRC python :tangle yes :exports code :results output drawer :prologue
+ b = tf.Variable(0.)
+ k = tf.Variable(0.)
+ y = k * x_data + b
+  #+END_SRC
+
+  #+name: args-build-graph-body-NN
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+  #+END_SRC
+
+*** 两函
+**** 两函参数表
+   #+name: args-build-graph-body-loss
+   #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+   err_fn_dict_key = 'sqr'
+   #+END_SRC
+
+**** 两函工具函数表
+
+   #+name: err_fn_dict
+   #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+     # err functon dict
+     err_fn_dict = {
+         'sqr': tf.square(y-prediction),
+     }
+   #+END_SRC
+
+**** 两函注释
+  #   1. err_fn:
+  #      1.1 名称空间设置
+  #      1.2 err fn(单点错误), 声明 summary, tf.summary.scalar/image/histogram node
+  #   2. loss_fn:
+  #      2.1 名称空间设置
+  #      2.2 loss fn(整体错误), 声明 summary, tf.summary.scalar/image/histogram node
+
+**** 两函操作
+   #+name: build-graph-body-loss
+   #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+     <<err_fn_dict>>
+     err = err_fn_dict[err_fn_dict_key]
+     loss = tf.reduce_mean(err)
+   #+END_SRC
+*** 三器
+**** 三器参数表
+  #+name: args-build-graph-body-izer
+  #+BEGIN_SRC python :tangle yes :exports code :results output drawer :prologue
+  optimizer_dict_key = 'GD'
+  #+END_SRC
+
+**** 三器工具函数
+  #+name: optimizer_dict
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+    # optimizer_dict
+    optimizer_dict = {
+        'GD': tf.train.GradientDescentOptimizer(0.2),
+    }
+  #+END_SRC
+
+**** 三器注释
+
+  #   1. 初始化器
+  #   2. 优化器
+  #      2.1 名称空间设置
+  #   3. 保存器
+**** 三器操作
+  #+name: build-graph-body-izer
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+ <<optimizer_dict>>
+ optimizer = optimizer_dict[optimizer_dict_key]
+ train = optimizer.minimize(loss)
+ init = tf.global_variables_initializer()
+  #+END_SRC
+
+** 图尾
+  #+name: args-build-graph-tail
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+  #+END_SRC
+
+  #+name: build-graph-tail
+  #+BEGIN_SRC python :tangle yes :exports code :results output drawer :prologue
+  #+END_SRC
+  # 准确率
+  #   1. correct_prediction
+  #      1.1 名称空间设置
+  #   2. accuracy
+  #      2.1 名称空间设置
+  # 合并 summary
+  # + <<for embeddings 可视化>>配置 embeddings 可视化参数
+
+* 图计算
+  #+name: args-compute-graph
+  #+BEGIN_SRC python :tangle yes :noweb yes :exports code :results output drawer :prologue
+  #+END_SRC
+
+  #+name: compute-graph
+  #+BEGIN_SRC python :tangle yes :exports code :results output drawer :prologue
+   with tf.Session() as sess:
+     sess.run(init)
+     for step in range(201):
+         sess.run(train)
+         if step % 20 == 0:
+             print(step, sess.run([k, b, loss]))
+  #+END_SRC
+
+ # 运行初始化器
+ # summary Writer for TB
+ # for epoch_num: <<
+ #          1. for n_batch:
+ #                 1.1 x_y_of_next_batch;
+ #                 1.2 运行 优化器计算 and summary计算
+ #          2. 运行准确率计算
+ # 运行保存器
+ # matplot绘图

@@ -1,0 +1,160 @@
+* 使用 Inception-v3 做圖像識別
+
+Inception-v3 是 1000 分類識別模型, 標籤有 1000 個分類.
+
+#+BEGIN_SRC ipython :tangle yes :session lec-7-useIncep :exports code :async t :results raw drawer
+  import os
+  import re
+
+  import matplotlib.pyplot as plt
+  import numpy as np
+  import tensorflow as tf
+  from PIL import Image
+
+
+  class NodeLookup(object):
+      def __init__(self):
+          label_lookup_path = 'inception_model/imagenet_2012_challenge_label_map_proto.pbtxt'
+          uid_lookup_path = 'inception_model/imagenet_synset_to_human_label_map.txt'
+          self.node_lookup = self.load(label_lookup_path, uid_lookup_path)
+
+      def load(self, label_lookup_path, uid_lookup_path):
+          # 加載分類字符串 n******** 對應分類名稱的文件
+          proto_as_ascii_lines = tf.gfile.GFile(uid_lookup_path).readlines()
+          uid_to_human = {}
+          # 一行一行讀取數據
+          for line in proto_as_ascii_lines:
+              # 去掉換行符
+              line = line.strip('\n')
+              # 按照 '\t' 分割
+              parsed_items = line.split('\t')
+              # 獲取分類編號
+              uid = parsed_items[0]
+              # 獲取分類名稱
+              human_string = parsed_items[1]
+              # 保存編號字符串 n********** 與分類名稱映射關係
+              # {"n01443243" : "gudgeon, Gobio gobio", ...}
+              uid_to_human[uid] = human_string
+
+          # 加載分類字符串 n******** 對應分類編號 1-1000 的文件
+          proto_as_ascii = tf.gfile.GFile(label_lookup_path).readlines()
+          node_id_to_uid = {}
+          for line in proto_as_ascii:
+              if line.startswith('  target_class:'):
+                  # 獲取分類編號 1-1000
+                  target_class = int(line.split(': ')[1])
+              if line.startswith('  target_class_string:'):
+                  # 獲取編號字符串 n*******
+                  target_class_string = line.split(': ')[1]
+                  # 保存分類編號1-1000 與編號字符串 n******** 映射關係
+                  # {450:"n01443537", ...}
+                  node_id_to_uid[target_class] = target_class_string[1:-2]
+
+          # 建立分類編號 1-1000 對應分類名稱的映射關係
+          node_id_to_name = {}
+          for key, val in node_id_to_uid.items():
+              # 獲取分類名稱
+              name = uid_to_human[val]
+              # 建立分類編號 1-1000 到分類名稱的映射關係
+              # node_id   name
+              # ----      --------------------
+              # {449:     "tench, Tinca tinca", ....}
+              node_id_to_name[key] = name
+          return node_id_to_name
+
+      # 傳入分類編號 1-1000 返回分類名稱
+      def id_to_string(self, node_id):
+          if node_id not in self.node_lookup:
+              return ''
+          return self.node_lookup[node_id]
+
+
+  # 創建一個空圖來加載 google 訓練好的模型
+  with tf.gfile.GFile('inception_model/classify_image_graph_def.pb', 'rb') as f:
+      graph_def = tf.GraphDef()
+      graph_def.ParseFromString(f.read())
+      tf.import_graph_def(graph_def, name='')
+
+  with tf.Session() as sess:
+      # 通過node名字加載你需要計算的 node
+      softmax_tensor = sess.graph.get_tensor_by_name('softmax:0')
+      # 遍歷目錄
+      for root, dirs, files in os.walk('images/'):
+          for file in files:
+              # 載入圖片
+              image_data = tf.gfile.FastGFile(os.path.join(root, file),
+                                              'rb').read()
+              # 餵食數據給graph的入口placeholder
+              predictions = sess.run(softmax_tensor,
+                                     {'DecodeJpeg/contents:0': image_data})
+              # predictions 是一個1000維向量, 每一個位都是一個概率值.
+              # (1000, 1) ==> (1000,)
+              predictions = np.squeeze(predictions)  # 結果轉換爲 1 維數據
+
+              # 打印圖片路徑及名稱
+              image_path = os.path.join(root, file)
+              print(image_path)
+
+              # 顯示圖片
+              img = Image.open(image_path)
+              plt.imshow(img)
+              plt.axis('off')
+              plt.show()
+
+              # 排序
+              # argsort 排序得到的是從小到大的list
+              #
+              # 對這5個值取倒序,將其變成從大到小 <-+
+              #                                    |
+              # 取最大的5個(其順序依然從小到大)    |
+              #                             |      |
+              #                            ----  ----
+              top_k = predictions.argsort()[-5:][::-1]
+              node_lookup = NodeLookup()
+              for node_id in top_k:
+                  # 獲取分類名稱
+                  human_string = node_lookup.id_to_string(node_id)
+                  # 獲取該分類置信度
+                  score = predictions[node_id]
+                  print('%s (score = %.5f)' % (human_string, score))
+              print()
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[2]:
+[[file:./obipy-resources/qksIVa.png]]
+:END:
+
+#+BEGIN_EXAMPLE
+/home/yiddi/git_repos/on_ml_tensorflow/inception_model/
+imagenet_2012_challenge_label_map_proto.pbtxt
+
+# -*- protobuffer -*-
+# LabelMap from ImageNet 2012 full data set UID to int32 target class.
+entry {
+  target_class: 449
+  target_class_string: "n01440764" -------------------------+
+}                                                           |
+entry {                                                     |
+  target_class: 450                                         |
+  target_class_string: "n01443537"                          |
+}                                                           |
+entry {                                                     |
+  target_class: 442                                         |
+  target_class_string: "n01484850"                          |
+}                                                           |
+                                                            |
+========================================================    |
+                                                            |
+/home/yiddi/git_repos/on_ml_tensorflow/inception_model/     |
+imagenet_synset_to_human_label_map.txt                      |
+                                                            |
+   +--------------------------------------------------------+
+   v
+n01440764	tench, Tinca tinca
+.....
+n01443537	goldfish, Carassius auratus
+.....
+n01484850	great white shark, white shark, man-eater, man-eating shark, Carcharodon carcharias
+#+END_EXAMPLE
