@@ -1,3 +1,19 @@
+# -*- org-export-babel-evaluate: nil -*-
+#+PROPERTY: header-args :eval never-export
+#+PROPERTY: header-args:python :session Tensorflow 基本调参技巧
+#+PROPERTY: header-args:ipython :session Tensorflow 基本调参技巧
+# #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="/home/yiddi/git_repos/YIDDI_org_export_theme/theme/org-nav-theme_cache.css" >
+# #+HTML_HEAD: <script src="https://hypothes.is/embed.js" async></script>
+# #+HTML_HEAD: <script type="application/json" class="js-hypothesis-config">
+# #+HTML_HEAD: <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+#+OPTIONS: html-link-use-abs-url:nil html-postamble:nil html-preamble:t
+#+OPTIONS: H:3 num:t ^:nil _:nil tags:not-in-toc
+#+TITLE: Tensorflow 基本调参技巧
+#+AUTHOR: yiddishkop
+#+EMAIL: [[mailto:yiddishkop@163.com][yiddi's email]]
+#+TAGS: {PKGIMPT(i) DATAVIEW(v) DATAPREP(p) GRAPHBUILD(b) GRAPHCOMPT(c)} LINAGAPI(a) PROBAPI(b) MATHFORM(f) MLALGO(m)
+
+
 * Tensorflow_3
 
 1. loss fn 的选择交叉熵适合 s 型激(sigmoid, tanh)活函数; 方差适合线性激活函数
@@ -40,7 +56,6 @@
 
 #+DOWNLOADED: /tmp/screenshot.png @ 2018-07-28 14:36:22
 [[file:Tensorflow_3/screenshot_2018-07-28_14-36-22.png]]
-
 
 * Dropout
 

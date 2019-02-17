@@ -1,3 +1,19 @@
+# -*- org-export-babel-evaluate: nil -*-
+#+PROPERTY: header-args :eval never-export
+#+PROPERTY: header-args:python :session TFrecord 使用技术
+#+PROPERTY: header-args:ipython :session TFrecord 使用技术
+# #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="/home/yiddi/git_repos/YIDDI_org_export_theme/theme/org-nav-theme_cache.css" >
+# #+HTML_HEAD: <script src="https://hypothes.is/embed.js" async></script>
+# #+HTML_HEAD: <script type="application/json" class="js-hypothesis-config">
+# #+HTML_HEAD: <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+#+OPTIONS: html-link-use-abs-url:nil html-postamble:nil html-preamble:t
+#+OPTIONS: H:3 num:t ^:nil _:nil tags:not-in-toc
+#+TITLE: TFrecord 使用技术
+#+AUTHOR: yiddishkop
+#+EMAIL: [[mailto:yiddishkop@163.com][yiddi's email]]
+#+TAGS: {PKGIMPT(i) DATAVIEW(v) DATAPREP(p) GRAPHBUILD(b) GRAPHCOMPT(c)} LINAGAPI(a) PROBAPI(b) MATHFORM(f) MLALGO(m)
+
+
 * 如何生成 TFrecord
 这里仍然给使用已经 pretrained 的模型来训练我们自己的任务, 也就是我们只训练最后一
 层.
@@ -255,7 +271,6 @@ min((shard_id+1) * num_per_shard, len(filename))
 
   tf.train.BytesList(xxx) 可以读取 bytes 文件, 也可以读取 string 文件
 #+END_EXAMPLE
-
 
 * 使用 tfrecord 和 slim 来处理的任务
 

@@ -1,5 +1,20 @@
-* 介绍 tensorflow debuger
+# -*- org-export-babel-evaluate: nil -*-
+#+PROPERTY: header-args :eval never-export
+#+PROPERTY: header-args:python :session Tensorflow Debug 介绍
+#+PROPERTY: header-args:ipython :session Tensorflow Debug 介绍
+# #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="/home/yiddi/git_repos/YIDDI_org_export_theme/theme/org-nav-theme_cache.css" >
+# #+HTML_HEAD: <script src="https://hypothes.is/embed.js" async></script>
+# #+HTML_HEAD: <script type="application/json" class="js-hypothesis-config">
+# #+HTML_HEAD: <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+#+OPTIONS: html-link-use-abs-url:nil html-postamble:nil html-preamble:t
+#+OPTIONS: H:3 num:t ^:nil _:nil tags:not-in-toc
+#+TITLE: Tensorflow Debug 介绍
+#+AUTHOR: yiddishkop
+#+EMAIL: [[mailto:yiddishkop@163.com][yiddi's email]]
+#+TAGS: {PKGIMPT(i) DATAVIEW(v) DATAPREP(p) GRAPHBUILD(b) GRAPHCOMPT(c)} LINAGAPI(a) PROBAPI(b) MATHFORM(f) MLALGO(m)
 
+
+* 介绍 tensorflow debuger
 ** tfdbg CLI 界面介绍
 
 想使用 tfdbg 的 CLI 模式, 只需两步:
@@ -43,7 +58,6 @@ Select one of the following commands to proceed ---->
 --- Scroll (PgDn): 0.00% --------------------------------------------------------- Mouse: ON --
 tfdbg>
 #+END_EXAMPLE
-
 
 ** tfdbg TensorBoard 界面介绍
 #+BEGIN_SRC ipython :tangle ./linear_regression.py :session tfdbg-2 :exports code :async t :results raw drawer
@@ -295,7 +309,6 @@ slicing 的方式去界定查看范围.
 
 #+DOWNLOADED: /tmp/screenshot.png @ 2018-08-02 23:01:56
 [[file:介绍 tensorflow debuger/screenshot_2018-08-02_23-01-56.png]]
-
 
 ** 一个 broken 例子
 

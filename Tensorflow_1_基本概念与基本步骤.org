@@ -1,5 +1,16 @@
-* Tensorflow 介绍
+# -*- org-export-babel-evaluate: nil -*-
+#+PROPERTY: header-args :eval never-export
+#+PROPERTY: header-args:python :session title
+#+PROPERTY: header-args:ipython :session title
+#+OPTIONS: html-link-use-abs-url:nil html-postamble:nil html-preamble:t
+#+OPTIONS: H:3 num:t ^:nil _:nil tags:not-in-toc
+#+TITLE: Tensorflow 基本概念
+#+AUTHOR: yiddishkop
+#+EMAIL: [[mailto:yiddishkop@163.com][yiddi's email]]
+#+TAGS: {PKGIMPT(i) DATAVIEW(v) DATAPREP(p) GRAPHBUILD(b) GRAPHCOMPT(c)} LINAGAPI(a) PROBAPI(b) MATHFORM(f) MLALGO(m)
 
+
+* Tensorflow 介绍
 *** 基本概念
 - 使用图 (Graphs) 来表示 *计算规划*;
 - 使用 Tensor 表示 *数据*
